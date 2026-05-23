@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CarPlay">
+<meta name="theme-color" content="#000000">
+<title>CarPlay</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+:root{--bg:#000;--bg2:#1c1c1e;--bg3:#2c2c2e;--text:#fff;--text2:rgba(255,255,255,0.6);--text3:rgba(255,255,255,0.35);--blue:#0a84ff;--green:#30d158;--red:#ff453a;--teal:#5ac8fa;--spotify:#1db954;--r:18px;}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{width:100%;height:100%;background:#000;font-family:-apple-system,'Helvetica Neue',sans-serif;color:#fff;overflow:hidden;-webkit-font-smoothing:antialiased;}
+.shell{width:100%;height:100dvh;display:flex;flex-direction:column;background:#000;overflow:hidden;}
+/* STATUS BAR */
+.sb{display:flex;align-items:center;justify-content:space-between;padding:max(env(safe-area-inset-top),12px) 20px 8px;background:rgba(0,0,0,0.8);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);z-index:200;flex-shrink:0;font-size:14px;font-weight:600;}
+.sb-r{display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,0.6);}
+/* HOME */
+#view-home{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.topbar{display:flex;align-items:center;padding:10px 18px 8px;gap:14px;border-bottom:0.5px solid rgba(255,255,255,0.08);flex-shrink:0;}
+.clock-big{font-size:48px;font-weight:200;letter-spacing:-2px;line-height:1;}
+.date-small{font-size:12px;color:rgba(255,255,255,0.35);margin-top:2px;}
+.speed-pill{margin-left:auto;background:#1c1c1e;border-radius:14px;padding:8px 16px;display:flex;flex-direction:column;align-items:center;}
+.speed-n{font-size:28px;font-weight:700;color:#5ac8fa;line-height:1;}
+.speed-l{font-size:10px;color:rgba(255,255,255,0.35);font-weight:500;}
+/* APP GRID */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 12px;flex:1;overflow:hidden;}
+.card{background:#1c1c1e;border-radius:var(--r);padding:16px;cursor:pointer;display:flex;flex-direction:column;gap:8px;overflow:hidden;position:relative;transition:transform .12s,opacity .12s;}
+.card:active{transform:scale(.96);opacity:.85;}
+.card.wide{grid-column:1/-1;}
+.card-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
+.card-lbl{font-size:11px;font-weight:600;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:.6px;}
+.card-title{font-size:16px;font-weight:600;line-height:1.2;}
+.card-sub{font-size:12px;color:rgba(255,255,255,0.45);}
+.map-preview{width:100%;height:58px;border-radius:10px;background:#1a2744;overflow:hidden;margin-top:2px;}
+.mini-bar{height:3px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden;margin-top:4px;}
+.mini-fill{height:100%;background:#1db954;border-radius:2px;width:40%;animation:mprog 4s linear infinite;}
+@keyframes mprog{to{width:75%;}}
+/* PANELS */
+.panel{display:none;flex-direction:column;flex:1;overflow:hidden;}
+.panel.active{display:flex;}
+.pnav{display:flex;align-items:center;padding:10px 16px 8px;gap:12px;border-bottom:.5px solid rgba(255,255,255,0.08);flex-shrink:0;}
+.pnav-back{font-size:24px;cursor:pointer;color:#0a84ff;}
+.pnav-title{font-size:20px;font-weight:700;}
+.pscroll{flex:1;overflow-y:auto;padding:12px;}
+.pscroll::-webkit-scrollbar{display:none;}
+/* MAP */
+#map-wrap{flex:1;position:relative;overflow:hidden;}
+#lmap{height:100%;width:100%;}
+.map-hud{position:absolute;bottom:12px;left:12px;right:12px;background:rgba(0,0,0,0.82);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-radius:16px;padding:12px 14px;z-index:500;}
+.map-hud-lbl{font-size:12px;color:rgba(255,255,255,0.35);margin-bottom:2px;}
+.map-hud-addr{font-size:15px;font-weight:600;}
+.map-hud-coord{font-size:11px;color:rgba(255,255,255,0.3);margin-top:2px;}
+.map-btn{position:absolute;top:12px;right:12px;width:40px;height:40px;background:rgba(0,0,0,0.8);backdrop-filter:blur(10px);border-radius:12px;display:flex;align-items:center;justify-content:center;z-index:500;cursor:pointer;font-size:18px;border:.5px solid rgba(255,255,255,0.1);}
+.map-spd{position:absolute;top:12px;left:12px;background:rgba(0,0,0,0.8);backdrop-filter:blur(10px);border-radius:12px;padding:8px 14px;z-index:500;display:flex;flex-direction:column;align-items:center;border:.5px solid rgba(255,255,255,0.1);}
+.map-spd-n{font-size:22px;font-weight:700;color:#5ac8fa;line-height:1;}
+.map-spd-l{font-size:10px;color:rgba(255,255,255,0.35);}
+.leaflet-control-zoom,.leaflet-control-attribution{display:none!important;}
+/* WEATHER */
+.w-hero{text-align:center;padding:4px 0 18px;}
+.w-emoji{font-size:64px;line-height:1;margin-bottom:6px;}
+.w-temp{font-size:80px;font-weight:200;letter-spacing:-4px;line-height:1;}
+.w-desc{font-size:16px;color:rgba(255,255,255,0.6);margin-top:6px;}
+.w-range{font-size:13px;color:rgba(255,255,255,0.35);margin-top:3px;}
+.w-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px;}
+.w-card{background:#1c1c1e;border-radius:14px;padding:14px;}
+.w-card.w-full{grid-column:1/-1;}
+.wc-l{font-size:11px;font-weight:600;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
+.wc-v{font-size:24px;font-weight:300;}
+.wc-s{font-size:11px;color:rgba(255,255,255,0.35);margin-top:2px;}
+.hourly{display:flex;gap:12px;overflow-x:auto;padding:8px 0 2px;}
+.hourly::-webkit-scrollbar{display:none;}
+.h-it{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:46px;}
+.h-t{font-size:11px;color:rgba(255,255,255,0.35);}
+.h-e{font-size:18px;}
+.h-v{font-size:14px;font-weight:600;}
+/* PHONE */
+.dial-disp{background:#1c1c1e;border-radius:14px;font-size:28px;font-weight:300;letter-spacing:4px;text-align:center;padding:16px;min-height:64px;margin-bottom:10px;word-break:break-all;}
+.kpad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px;}
+.k{background:#1c1c1e;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px 8px;cursor:pointer;font-size:24px;font-weight:400;line-height:1;}
+.k:active{background:#2c2c2e;}
+.k sub{font-size:9px;color:rgba(255,255,255,0.35);font-weight:600;letter-spacing:1.5px;margin-top:1px;}
+.k-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;}
+.k-call{background:#30d158;border-radius:14px;display:flex;align-items:center;justify-content:center;gap:8px;padding:16px;cursor:pointer;text-decoration:none;font-size:16px;font-weight:700;color:#000;}
+.k-call:active{opacity:.8;}
+.k-del{background:#1c1c1e;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;color:rgba(255,255,255,0.6);}
+.k-del:active{background:#2c2c2e;}
+.ctitle{font-size:13px;font-weight:700;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:.5px solid rgba(255,255,255,0.06);}
+.cav{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;}
+.cn{font-size:15px;font-weight:500;}
+.cnum{font-size:12px;color:rgba(255,255,255,0.35);}
+.ccall{margin-left:auto;width:38px;height:38px;border-radius:50%;background:rgba(48,209,88,0.15);display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:18px;flex-shrink:0;}
+/* SPOTIFY */
+.sp-now{background:#1c1c1e;border-radius:var(--r);padding:18px;margin-bottom:12px;}
+.sp-track{font-size:18px;font-weight:700;margin-bottom:2px;}
+.sp-artist{font-size:13px;color:rgba(255,255,255,0.45);margin-bottom:14px;}
+.sp-bar{height:4px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;margin-bottom:16px;}
+.sp-fill{height:100%;background:#1db954;border-radius:3px;width:40%;}
+.sp-ctrls{display:flex;justify-content:space-around;align-items:center;}
+.sp-ctrls a{color:rgba(255,255,255,0.8);text-decoration:none;font-size:28px;}
+.sp-ctrls .sp-big{font-size:46px;color:#1db954;}
+.sp-btn{display:flex;align-items:center;justify-content:center;gap:8px;border-radius:14px;padding:15px;text-decoration:none;font-size:15px;font-weight:700;margin-bottom:10px;}
+.sp-g{background:#1db954;color:#000;}
+.sp-o{background:rgba(29,185,84,0.12);color:#1db954;border:.5px solid rgba(29,185,84,0.3);}
+.sp-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+.sp-note{font-size:12px;color:rgba(255,255,255,0.3);text-align:center;line-height:1.6;padding-top:4px;}
+/* DOCK */
+.dock{display:flex;justify-content:space-around;align-items:center;padding:10px 8px max(env(safe-area-inset-bottom),12px);background:rgba(0,0,0,0.88);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border-top:.5px solid rgba(255,255,255,0.06);flex-shrink:0;z-index:100;}
+.di{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:4px 12px;border-radius:12px;opacity:.45;transition:opacity .15s;min-width:52px;}
+.di.active{opacity:1;}
+.di .de{font-size:26px;}
+.di .dl{font-size:10px;font-weight:600;color:rgba(255,255,255,0.6);}
+.di.active .dl{color:#0a84ff;}
+.loading{text-align:center;padding:40px;color:rgba(255,255,255,0.35);font-size:14px;}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<div class="sb">
+  <span id="sb-time">--:--</span>
+  <div class="sb-r">
+    <span id="sb-gps" style="font-size:10px;"></span>
+    <span id="sb-bat" style="font-size:12px;font-weight:600;">🔋</span>
+  </div>
+</div>
+
+<!-- HOME -->
+<div id="view-home" style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+  <div class="topbar">
+    <div>
+      <div class="clock-big" id="cp-time">--:--</div>
+      <div class="date-small" id="cp-date">--</div>
+    </div>
+    <div class="speed-pill">
+      <div class="speed-n" id="home-spd">0</div>
+      <div class="speed-l">km/h</div>
+    </div>
+  </div>
+  <div class="grid">
+    <!-- MAPS -->
+    <div class="card wide" onclick="goTo('map')">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="card-icon" style="background:rgba(52,199,89,.18);">🗺️</div>
+        <div>
+          <div class="card-lbl">Mappe GPS</div>
+          <div class="card-title" id="h-addr">Localizzazione...</div>
+          <div class="card-sub" id="h-coord">Tocca per aprire</div>
+        </div>
+        <span id="h-gpsdot" style="margin-left:auto;font-size:10px;"></span>
+      </div>
+      <div class="map-preview">
+        <svg viewBox="0 0 360 58" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+          <rect width="360" height="58" fill="#1a2744"/>
+          <line x1="0" y1="29" x2="360" y2="29" stroke="#2a3a5e" stroke-width="14"/>
+          <line x1="0" y1="50" x2="360" y2="38" stroke="#2a3a5e" stroke-width="18"/>
+          <line x1="90" y1="0" x2="90" y2="58" stroke="#2a3a5e" stroke-width="8"/>
+          <line x1="230" y1="0" x2="230" y2="58" stroke="#2a3a5e" stroke-width="10"/>
+          <rect x="100" y="5" width="55" height="20" rx="3" fill="#243050"/>
+          <rect x="245" y="32" width="60" height="20" rx="3" fill="#243050"/>
+          <circle cx="178" cy="29" r="5" fill="#5ac8fa"/>
+          <circle cx="178" cy="29" r="10" fill="rgba(90,200,250,0.2)"/>
+        </svg>
+      </div>
+    </div>
+    <!-- MUSIC -->
+    <div class="card" onclick="goTo('music')">
+      <div class="card-icon" style="background:rgba(29,185,84,.18);">🎵</div>
+      <div class="card-lbl">Spotify</div>
+      <div class="card-title" style="font-size:14px;">Musica</div>
+      <div class="card-sub">Apri player</div>
+      <div class="mini-bar"><div class="mini-fill"></div></div>
+    </div>
+    <!-- PHONE -->
+    <div class="card" onclick="goTo('phone')">
+      <div class="card-icon" style="background:rgba(48,209,88,.18);">📞</div>
+      <div class="card-lbl">Telefono</div>
+      <div class="card-title" style="font-size:14px;">Chiamate</div>
+      <div class="card-sub">Tastierino</div>
+    </div>
+    <!-- WEATHER -->
+    <div class="card wide" onclick="goTo('weather')" style="flex-direction:row;align-items:center;gap:16px;min-height:80px;">
+      <div>
+        <div class="card-lbl">Meteo</div>
+        <div style="font-size:40px;font-weight:200;line-height:1;" id="h-wtemp">--°</div>
+      </div>
+      <div>
+        <div class="card-title" id="h-wdesc" style="font-size:15px;">Caricamento...</div>
+        <div class="card-sub" id="h-wrange">--</div>
+      </div>
+      <div style="margin-left:auto;font-size:40px;" id="h-wicon">🌤️</div>
+    </div>
+  </div>
+</div>
+
+<!-- MAP -->
+<div id="view-map" class="panel">
+  <div class="pnav">
+    <span class="pnav-back" onclick="goTo('home')">‹</span>
+    <span class="pnav-title">Mappa</span>
+    <span id="map-gpstag" style="margin-left:auto;font-size:11px;color:rgba(255,255,255,0.35);">Acquisendo GPS...</span>
+  </div>
+  <div id="map-wrap">
+    <div id="lmap"></div>
+    <div class="map-spd"><div class="map-spd-n" id="map-spd">0</div><div class="map-spd-l">km/h</div></div>
+    <div class="map-btn" onclick="centerMap()">🎯</div>
+    <div class="map-hud">
+      <div class="map-hud-lbl">📍 Posizione attuale</div>
+      <div class="map-hud-addr" id="map-addr">Acquisendo GPS...</div>
+      <div class="map-hud-coord" id="map-coord"></div>
+    </div>
+  </div>
+</div>
+
+<!-- WEATHER -->
+<div id="view-weather" class="panel">
+  <div class="pnav">
+    <span class="pnav-back" onclick="goTo('home')">‹</span>
+    <span class="pnav-title">Meteo</span>
+  </div>
+  <div class="pscroll" id="w-content"><div class="loading">⏳ Caricamento meteo...</div></div>
+</div>
+
+<!-- PHONE -->
+<div id="view-phone" class="panel">
+  <div class="pnav">
+    <span class="pnav-back" onclick="goTo('home')">‹</span>
+    <span class="pnav-title">Telefono</span>
+  </div>
+  <div class="pscroll">
+    <div class="dial-disp" id="dial-d">&#8203;</div>
+    <div class="kpad">
+      <div class="k" onclick="kp('1')">1<sub></sub></div>
+      <div class="k" onclick="kp('2')">2<sub>ABC</sub></div>
+      <div class="k" onclick="kp('3')">3<sub>DEF</sub></div>
+      <div class="k" onclick="kp('4')">4<sub>GHI</sub></div>
+      <div class="k" onclick="kp('5')">5<sub>JKL</sub></div>
+      <div class="k" onclick="kp('6')">6<sub>MNO</sub></div>
+      <div class="k" onclick="kp('7')">7<sub>PQRS</sub></div>
+      <div class="k" onclick="kp('8')">8<sub>TUV</sub></div>
+      <div class="k" onclick="kp('9')">9<sub>WXYZ</sub></div>
+      <div class="k" onclick="kp('*')">＊<sub></sub></div>
+      <div class="k" onclick="kp('0')">0<sub>+</sub></div>
+      <div class="k" onclick="kp('#')">#<sub></sub></div>
+    </div>
+    <div class="k-actions">
+      <a id="call-a" href="tel:" class="k-call" onclick="return !!dialNum">📞 Chiama</a>
+      <div class="k-del" onclick="kpDel()">⌫</div>
+    </div>
+    <div class="ctitle">Contatti rapidi</div>
+    <!-- ✏️ MODIFICA I TUOI CONTATTI QUI -->
+    <div class="crow">
+      <div class="cav" style="background:rgba(255,69,58,.2);color:#ff453a;">MB</div>
+      <div><div class="cn">Marco B.</div><div class="cnum">+39 333 1234567</div></div>
+      <a class="ccall" href="tel:+393331234567">📞</a>
+    </div>
+    <div class="crow">
+      <div class="cav" style="background:rgba(90,200,250,.2);color:#5ac8fa;">SR</div>
+      <div><div class="cn">Sara R.</div><div class="cnum">+39 347 9876543</div></div>
+      <a class="ccall" href="tel:+393479876543">📞</a>
+    </div>
+    <div class="crow">
+      <div class="cav" style="background:rgba(48,209,88,.2);color:#30d158;">LP</div>
+      <div><div class="cn">Luca P.</div><div class="cnum">+39 320 5551234</div></div>
+      <a class="ccall" href="tel:+393205551234">📞</a>
+    </div>
+    <div style="font-size:11px;color:rgba(255,255,255,0.2);text-align:center;margin-top:12px;">Modifica i contatti aprendo il file HTML con un editor di testo</div>
+  </div>
+</div>
+
+<!-- SPOTIFY -->
+<div id="view-music" class="panel">
+  <div class="pnav">
+    <span class="pnav-back" onclick="goTo('home')">‹</span>
+    <span class="pnav-title">Spotify</span>
+  </div>
+  <div class="pscroll">
+    <div class="sp-now">
+      <div class="sp-track">Apri Spotify sul telefono</div>
+      <div class="sp-artist">Poi usa i controlli qui sotto</div>
+      <div class="sp-bar"><div class="sp-fill"></div></div>
+      <div class="sp-ctrls">
+        <a href="spotify:prev">⏮️</a>
+        <a href="spotify:play" class="sp-big">▶️</a>
+        <a href="spotify:next">⏭️</a>
+      </div>
+    </div>
+    <a href="spotify:" class="sp-btn sp-g">🎵 &nbsp;Apri Spotify</a>
+    <div class="sp-grid">
+      <a href="spotify:search:road%20trip" class="sp-btn sp-o" style="margin-bottom:0;font-size:13px;">🚗 Road trip</a>
+      <a href="spotify:search:chill%20vibes" class="sp-btn sp-o" style="margin-bottom:0;font-size:13px;">😌 Chill</a>
+      <a href="spotify:search:anni%2080%20italiani" class="sp-btn sp-o" style="margin-bottom:0;font-size:13px;">🕺 Anni 80</a>
+      <a href="spotify:search:musica%20da%20guidare" class="sp-btn sp-o" style="margin-bottom:0;font-size:13px;">🎶 Guida</a>
+    </div>
+    <div class="sp-note">I pulsanti aprono la app Spotify installata sul tuo telefono.<br>Spotify deve essere installata.</div>
+  </div>
+</div>
+
+<!-- DOCK -->
+<div class="dock">
+  <div class="di active" id="di-home" onclick="goTo('home')"><div class="de">🏠</div><div class="dl">Home</div></div>
+  <div class="di" id="di-map" onclick="goTo('map')"><div class="de">🗺️</div><div class="dl">Mappa</div></div>
+  <div class="di" id="di-music" onclick="goTo('music')"><div class="de">🎵</div><div class="dl">Spotify</div></div>
+  <div class="di" id="di-phone" onclick="goTo('phone')"><div class="de">📞</div><div class="dl">Telefono</div></div>
+  <div class="di" id="di-weather" onclick="goTo('weather')"><div class="de">🌤️</div><div class="dl">Meteo</div></div>
+</div>
+
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+'use strict';
+// CLOCK
+function tick(){
+  const n=new Date(),pad=x=>String(x).padStart(2,'0');
+  const t=pad(n.getHours())+':'+pad(n.getMinutes());
+  document.getElementById('sb-time').textContent=t;
+  document.getElementById('cp-time').textContent=t;
+  const D=['Dom','Lun','Mar','Mer','Gio','Ven','Sab'],M=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+  document.getElementById('cp-date').textContent=D[n.getDay()]+' '+n.getDate()+' '+M[n.getMonth()];
+}
+tick();setInterval(tick,10000);
+// BATTERY
+if(navigator.getBattery)navigator.getBattery().then(b=>{
+  const p=Math.round(b.level*100);
+  document.getElementById('sb-bat').textContent=(b.charging?'⚡':p<20?'🔴':'🔋')+p+'%';
+});
+// NAV
+const VIEWS=['home','map','weather','phone','music'];
+function goTo(n){
+  VIEWS.forEach(v=>{
+    const e=document.getElementById('view-'+v);
+    if(e){e.style.display='none';e.classList.remove('active');}
+    const d=document.getElementById('di-'+v);
+    if(d)d.classList.remove('active');
+  });
+  const t=document.getElementById('view-'+n);
+  if(t){t.style.display='flex';t.classList.add('active');}
+  const d=document.getElementById('di-'+n);
+  if(d)d.classList.add('active');
+  if(n==='map'&&!mapReady)initMap();
+}
+goTo('home');
+// GPS & MAP
+let lat=null,lon=null,mapReady=false,lmap=null,mkr=null,wDone=false;
+function initMap(){
+  mapReady=true;
+  lmap=L.map('lmap',{zoomControl:false,attributionControl:false}).setView([45.4654,9.1859],14);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(lmap);
+  startGPS();
+}
+function startGPS(){
+  if(!navigator.geolocation){setGPSErr();fallbackW();return;}
+  navigator.geolocation.watchPosition(onPos,onPosErr,{enableHighAccuracy:true,maximumAge:4000,timeout:20000});
+}
+function onPos(p){
+  lat=p.coords.latitude;lon=p.coords.longitude;
+  const spd=p.coords.speed,kmh=spd!=null?Math.round(spd*3.6):0;
+  document.getElementById('home-spd').textContent=kmh;
+  const ms=document.getElementById('map-spd');if(ms)ms.textContent=kmh;
+  document.getElementById('sb-gps').innerHTML='<span style="color:#30d158;">● GPS</span>';
+  const mt=document.getElementById('map-gpstag');if(mt)mt.innerHTML='<span style="color:#30d158;font-weight:600;">● Live</span>';
+  document.getElementById('h-gpsdot').innerHTML='<span style="color:#30d158;">● live</span>';
+  const cs=lat.toFixed(5)+'°N  '+lon.toFixed(5)+'°E';
+  const mc=document.getElementById('map-coord');if(mc)mc.textContent=cs;
+  if(lmap){
+    const ic=L.divIcon({html:'<div style="width:16px;height:16px;background:#5ac8fa;border-radius:50%;border:3px solid #fff;box-shadow:0 0 12px rgba(90,200,250,0.7);"></div>',iconSize:[16,16],iconAnchor:[8,8],className:''});
+    if(!mkr){mkr=L.marker([lat,lon],{icon:ic}).addTo(lmap);lmap.setView([lat,lon],16);}
+    else mkr.setLatLng([lat,lon]);
+  }
+  fetch('https://nominatim.openstreetmap.org/reverse?lat='+lat+'&lon='+lon+'&format=json&accept-language=it')
+    .then(r=>r.json()).then(d=>{
+      const a=d.address||{};
+      const road=a.road||a.pedestrian||a.path||'';
+      const city=a.city||a.town||a.village||a.municipality||'';
+      const addr=[road,city].filter(Boolean).join(', ')||'Posizione rilevata';
+      const me=document.getElementById('map-addr');if(me)me.textContent=addr;
+      document.getElementById('h-addr').textContent=addr;
+      document.getElementById('h-coord').textContent=cs;
+    }).catch(()=>{
+      const me=document.getElementById('map-addr');if(me)me.textContent=cs;
+      document.getElementById('h-addr').textContent='GPS attivo';
+    });
+  if(!wDone)loadW(lat,lon);
+}
+function onPosErr(){setGPSErr();fallbackW();}
+function setGPSErr(){
+  document.getElementById('sb-gps').innerHTML='<span style="color:#ff453a;">✕ GPS</span>';
+  document.getElementById('h-addr').textContent='GPS non disponibile';
+  document.getElementById('h-coord').textContent='Permetti la posizione nel browser';
+}
+function fallbackW(){if(!wDone)loadW(45.4654,9.1859);}
+function centerMap(){if(lmap&&lat)lmap.setView([lat,lon],16);}
+// WEATHER
+const WD={0:'Sereno',1:'Prev. sereno',2:'Parz. nuvoloso',3:'Nuvoloso',45:'Nebbia',48:'Nebbia',51:'Pioggerella',53:'Pioggerella',55:'Pioggerella',61:'Pioggia leggera',63:'Pioggia',65:'Pioggia intensa',71:'Neve leggera',73:'Neve',75:'Neve intensa',80:'Rovesci',81:'Rovesci',82:'Rovesci forti',95:'Temporale',96:'Temporale',99:'Temporale forte'};
+const WE={0:'☀️',1:'🌤️',2:'⛅',3:'☁️',45:'🌫️',48:'🌫️',51:'🌦️',53:'🌦️',55:'🌧️',61:'🌧️',63:'🌧️',65:'🌧️',71:'🌨️',73:'❄️',75:'❄️',80:'🌦️',81:'🌧️',82:'⛈️',95:'⛈️',96:'⛈️',99:'⛈️'};
+const WC={0:'#ffd60a',1:'#ffd60a',2:'#5ac8fa',3:'#8e8e93',45:'#8e8e93',48:'#8e8e93',51:'#5ac8fa',53:'#5ac8fa',55:'#0a84ff',61:'#0a84ff',63:'#0a84ff',65:'#0a84ff',71:'#e5e5ea',73:'#e5e5ea',75:'#e5e5ea',80:'#0a84ff',81:'#0a84ff',82:'#5e5ce6',95:'#5e5ce6',96:'#5e5ce6',99:'#5e5ce6'};
+function loadW(la,lo){
+  wDone=true;
+  fetch('https://api.open-meteo.com/v1/forecast?latitude='+la+'&longitude='+lo+'&current=temperature_2m,weathercode,windspeed_10m,relativehumidity_2m,apparent_temperature&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_sum&hourly=temperature_2m,weathercode&timezone=auto&forecast_days=1')
+    .then(r=>r.json()).then(renderW).catch(()=>{document.getElementById('w-content').innerHTML='<div class="loading" style="color:#ff453a;">❌ Errore meteo</div>';});
+}
+function renderW(d){
+  const c=d.current,dy=d.daily,hr=d.hourly;
+  const wc=c.weathercode,temp=Math.round(c.temperature_2m),feels=Math.round(c.apparent_temperature);
+  const tmax=Math.round(dy.temperature_2m_max[0]),tmin=Math.round(dy.temperature_2m_min[0]);
+  const desc=WD[wc]||'Varia',emoji=WE[wc]||'🌤️',col=WC[wc]||'#5ac8fa';
+  const wind=Math.round(c.windspeed_10m),hum=c.relativehumidity_2m,rain=(dy.precipitation_sum[0]||0).toFixed(1);
+  document.getElementById('h-wtemp').textContent=temp+'°';
+  document.getElementById('h-wdesc').textContent=desc;
+  document.getElementById('h-wrange').textContent='Min '+tmin+'° · Max '+tmax+'°';
+  document.getElementById('h-wicon').textContent=emoji;
+  const nowH=new Date().getHours();
+  let hh='';
+  for(let i=nowH;i<Math.min(nowH+7,hr.time.length);i++){
+    const lbl=i===nowH?'Ora':hr.time[i].split('T')[1].slice(0,5);
+    hh+='<div class="h-it"><div class="h-t">'+lbl+'</div><div class="h-e">'+(WE[hr.weathercode[i]]||'🌤️')+'</div><div class="h-v">'+Math.round(hr.temperature_2m[i])+'°</div></div>';
+  }
+  document.getElementById('w-content').innerHTML=
+    '<div class="w-hero"><div class="w-emoji">'+emoji+'</div><div class="w-temp" style="color:'+col+';">'+temp+'°</div><div class="w-desc">'+desc+'</div><div class="w-range">Percepita '+feels+'° &nbsp;·&nbsp; Min '+tmin+'° Max '+tmax+'°</div></div>'
+    +'<div class="w-cards">'
+    +'<div class="w-card w-full"><div class="wc-l">Prossime ore</div><div class="hourly">'+hh+'</div></div>'
+    +'<div class="w-card"><div class="wc-l">Vento</div><div class="wc-v">'+wind+'<span style="font-size:14px;"> km/h</span></div><div class="wc-s">'+(wind<15?'Leggero':wind<35?'Moderato':'Forte')+'</div></div>'
+    +'<div class="w-card"><div class="wc-l">Umidità</div><div class="wc-v">'+hum+'<span style="font-size:14px;">%</span></div><div class="wc-s">'+(hum>70?'Alta':hum>40?'Moderata':'Bassa')+'</div></div>'
+    +'<div class="w-card"><div class="wc-l">Pioggia oggi</div><div class="wc-v">'+rain+'<span style="font-size:14px;"> mm</span></div><div class="wc-s">'+(rain>5?'Significativa':rain>0?'Leggera':'Assente')+'</div></div>'
+    +'<div class="w-card"><div class="wc-l">Max oggi</div><div class="wc-v">'+tmax+'°</div><div class="wc-s">Min '+tmin+'°</div></div>'
+    +'</div>';
+}
+// DIALER
+let dialNum='';
+function kp(d){dialNum+=d;document.getElementById('dial-d').textContent=dialNum||'\u200b';document.getElementById('call-a').href='tel:'+dialNum;}
+function kpDel(){dialNum=dialNum.slice(0,-1);document.getElementById('dial-d').textContent=dialNum||'\u200b';document.getElementById('call-a').href='tel:'+dialNum;}
+// INIT
+if(navigator.geolocation)navigator.geolocation.getCurrentPosition(onPos,()=>fallbackW(),{enableHighAccuracy:false,timeout:10000});
+else fallbackW();
+setTimeout(fallbackW,5000);
+</script>
+</body>
+</html>
