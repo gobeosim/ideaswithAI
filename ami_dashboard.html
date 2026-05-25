@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ami Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0c0f;
+    color: #e0e8f0;
+    font-family: 'Inter', sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+  }
+
+  /* Top bar */
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 28px;
+    background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .topbar .time {
+    font-family: 'Orbitron', monospace;
+    font-size: 14px;
+    color: #7eb8d4;
+    letter-spacing: 2px;
+  }
+  .topbar .brand {
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: #3a5060;
+    text-transform: uppercase;
+  }
+  .topbar .status-icons {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #2ecc71;
+    box-shadow: 0 0 6px #2ecc71;
+  }
+  .status-dot.warn { background: #f39c12; box-shadow: 0 0 6px #f39c12; }
+
+  /* Main layout */
+  .main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    grid-template-rows: 1fr;
+    gap: 0;
+    overflow: hidden;
+  }
+
+  /* Left: speedometer area */
+  .speed-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    position: relative;
+  }
+
+  /* Speedometer SVG */
+  .speedo-wrap {
+    position: relative;
+    width: 340px;
+    height: 340px;
+  }
+  #speedo-svg { width: 100%; height: 100%; }
+
+  .speed-readout {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .speed-num {
+    font-family: 'Orbitron', monospace;
+    font-size: 72px;
+    font-weight: 900;
+    color: #fff;
+    line-height: 1;
+    text-shadow: 0 0 30px rgba(100,180,255,0.4);
+    transition: color 0.3s;
+  }
+  .speed-unit {
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    color: #4a7a9b;
+    letter-spacing: 3px;
+    margin-top: 4px;
+  }
+
+  /* Info row below speedo */
+  .info-row {
+    display: flex;
+    gap: 32px;
+    margin-top: 28px;
+  }
+  .info-cell {
+    text-align: center;
+  }
+  .info-cell .label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #3a5a6a;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .info-cell .val {
+    font-family: 'Orbitron', monospace;
+    font-size: 18px;
+    color: #7eb8d4;
+  }
+
+  /* Throttle slider */
+  .throttle-section {
+    margin-top: 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .throttle-label {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: #3a5a6a;
+    text-transform: uppercase;
+  }
+  #throttle {
+    -webkit-appearance: none;
+    width: 240px;
+    height: 4px;
+    background: linear-gradient(to right, #1a5a7a 0%, #1a5a7a var(--pct, 0%), #1a2030 var(--pct, 0%));
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  #throttle::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: #7eb8d4;
+    border: 2px solid #0a0c0f;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(126,184,212,0.5);
+  }
+
+  /* Right panel */
+  .right-panel {
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid rgba(255,255,255,0.05);
+    background: rgba(255,255,255,0.015);
+    overflow: hidden;
+  }
+
+  /* 3D Model area */
+  .model-section {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+  .model-section iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+  }
+  .model-label {
+    position: absolute;
+    top: 10px;
+    left: 14px;
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: rgba(255,255,255,0.2);
+    text-transform: uppercase;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  /* Music card */
+  .music-card {
+    border-top: 1px solid rgba(255,255,255,0.05);
+    padding: 14px 18px;
+    background: rgba(0,0,0,0.2);
+  }
+  .card-title {
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: #2a4a5a;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .music-inner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .album-art {
+    width: 44px; height: 44px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #1a3a5a, #0a1a2a);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .album-art .vinyl {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: conic-gradient(#1a2030 0deg, #2a3a50 30deg, #1a2030 60deg, #2a3a50 90deg, #1a2030 120deg, #2a3a50 150deg, #1a2030 180deg, #2a3a50 210deg, #1a2030 240deg, #2a3a50 270deg, #1a2030 300deg, #2a3a50 330deg, #1a2030 360deg);
+    animation: spin 3s linear infinite;
+  }
+  .album-art .vinyl-dot {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #0a0c0f;
+    border: 2px solid #3a5060;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .music-info { flex: 1; min-width: 0; }
+  .song-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: #c8dae8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .song-artist {
+    font-size: 11px;
+    color: #3a6070;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .music-progress {
+    margin-top: 8px;
+    height: 2px;
+    background: #1a2030;
+    border-radius: 1px;
+    overflow: hidden;
+  }
+  .music-bar {
+    height: 100%;
+    background: #4a8aaa;
+    border-radius: 1px;
+    animation: progress 180s linear forwards;
+  }
+  @keyframes progress { from { width: 23%; } to { width: 100%; } }
+
+  .music-ctrl {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    justify-content: flex-end;
+  }
+  .ctrl-btn {
+    background: none;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 4px;
+    color: #4a7a9b;
+    font-size: 12px;
+    padding: 3px 8px;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .ctrl-btn:hover { color: #7eb8d4; border-color: rgba(126,184,212,0.3); }
+  .ctrl-btn.active { color: #7eb8d4; border-color: rgba(126,184,212,0.4); }
+
+  /* Bluetooth card */
+  .bt-card {
+    border-top: 1px solid rgba(255,255,255,0.05);
+    padding: 12px 18px;
+    background: rgba(0,0,0,0.3);
+  }
+  .bt-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .bt-device {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .bt-icon {
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    background: rgba(33, 133, 208, 0.12);
+    border: 1px solid rgba(33, 133, 208, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+  }
+  .bt-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: #c8dae8;
+  }
+  .bt-type {
+    font-size: 10px;
+    color: #3a5060;
+    margin-top: 1px;
+  }
+  .bt-signal {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 16px;
+  }
+  .bt-bar {
+    width: 3px;
+    background: #1a5a7a;
+    border-radius: 1px;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  .bt-bar:nth-child(1) { height: 5px; animation-delay: 0s; }
+  .bt-bar:nth-child(2) { height: 9px; animation-delay: 0.2s; }
+  .bt-bar:nth-child(3) { height: 13px; animation-delay: 0.4s; }
+  .bt-bar:nth-child(4) { height: 16px; animation-delay: 0.6s; }
+  @keyframes pulse {
+    0%, 100% { background: #1a5a7a; }
+    50% { background: #4a9abf; }
+  }
+
+  .bt-connected {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    color: #2ecc71;
+    letter-spacing: 1px;
+  }
+  .bt-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: #2ecc71;
+    animation: blink 2s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+  /* Battery bar */
+  .battery-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 18px;
+    background: rgba(0,0,0,0.2);
+    border-top: 1px solid rgba(255,255,255,0.04);
+  }
+  .batt-label {
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: #2a4050;
+    text-transform: uppercase;
+    width: 50px;
+  }
+  .batt-track {
+    flex: 1;
+    height: 4px;
+    background: #0d1620;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .batt-fill {
+    height: 100%;
+    width: 78%;
+    background: linear-gradient(to right, #2ecc71, #27ae60);
+    border-radius: 2px;
+    transition: width 0.5s;
+  }
+  .batt-pct {
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    color: #2ecc71;
+    width: 36px;
+    text-align: right;
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="time" id="clock">--:--</div>
+  <div class="brand">Citroën · Ami</div>
+  <div class="status-icons">
+    <div class="status-dot"></div>
+    <div class="status-dot warn"></div>
+  </div>
+</div>
+
+<div class="main">
+  <!-- LEFT: Speedometer -->
+  <div class="speed-section">
+    <div class="speedo-wrap">
+      <svg id="speedo-svg" viewBox="0 0 340 340" xmlns="http://www.w3.org/2000/svg">
+        <!-- Outer ring -->
+        <circle cx="170" cy="170" r="155" fill="none" stroke="#0d1a24" stroke-width="2"/>
+        <!-- Track background arc -->
+        <path id="arc-bg" d="" fill="none" stroke="#101820" stroke-width="22" stroke-linecap="round"/>
+        <!-- Speed fill arc -->
+        <path id="arc-fill" d="" fill="none" stroke="#1a6a9a" stroke-width="22" stroke-linecap="round"/>
+        <!-- Needle glow arc (thin) -->
+        <path id="arc-glow" d="" fill="none" stroke="#7eb8d4" stroke-width="2" stroke-linecap="round"/>
+        <!-- Tick marks -->
+        <g id="ticks"></g>
+        <!-- Labels -->
+        <g id="labels"></g>
+        <!-- Center decoration -->
+        <circle cx="170" cy="170" r="30" fill="#0a0c0f" stroke="#1a2a3a" stroke-width="1"/>
+        <circle cx="170" cy="170" r="6" fill="#7eb8d4"/>
+        <circle cx="170" cy="170" r="3" fill="#0a0c0f"/>
+      </svg>
+      <div class="speed-readout">
+        <div class="speed-num" id="speed-display">0</div>
+        <div class="speed-unit">km/h</div>
+      </div>
+    </div>
+
+    <div class="info-row">
+      <div class="info-cell">
+        <div class="label">Autonomia</div>
+        <div class="val" id="range-val">75 km</div>
+      </div>
+      <div class="info-cell">
+        <div class="label">Percorsa</div>
+        <div class="val" id="odometer">0.0 km</div>
+      </div>
+      <div class="info-cell">
+        <div class="label">Media</div>
+        <div class="val" id="avg-speed">0 km/h</div>
+      </div>
+    </div>
+
+    <div class="throttle-section">
+      <div class="throttle-label">Acceleratore</div>
+      <input type="range" id="throttle" min="0" max="45" value="0" step="1">
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <!-- 3D Model -->
+    <div class="model-section">
+      <div class="model-label">Modello 3D</div>
+      <iframe
+        title="Citroen Ami 3D"
+        src="https://sketchfab.com/models/e2a98d3a79cc4c4a951fd226e104c5d8/embed?autostart=1&ui_hint=0&ui_infos=0&ui_stop=0&ui_inspector=0&ui_watermark=0&camera=0&transparent=1&dnt=1"
+        allow="autoplay; fullscreen; xr-spatial-tracking"
+        mozallowfullscreen="true"
+        webkitallowfullscreen="true"
+      ></iframe>
+    </div>
+
+    <!-- Battery -->
+    <div class="battery-bar">
+      <div class="batt-label">Batteria</div>
+      <div class="batt-track">
+        <div class="batt-fill" id="batt-fill"></div>
+      </div>
+      <div class="batt-pct" id="batt-pct">78%</div>
+    </div>
+
+    <!-- Music -->
+    <div class="music-card">
+      <div class="card-title">Musica</div>
+      <div class="music-inner">
+        <div class="album-art">
+          <div class="vinyl"></div>
+          <div class="vinyl-dot"></div>
+        </div>
+        <div class="music-info">
+          <div class="song-title" id="song-title">Pepper</div>
+          <div class="song-artist" id="song-artist">Butthole Surfers</div>
+          <div class="music-progress">
+            <div class="music-bar"></div>
+          </div>
+        </div>
+      </div>
+      <div class="music-ctrl">
+        <button class="ctrl-btn" onclick="prevSong()">⏮</button>
+        <button class="ctrl-btn active" id="play-btn" onclick="togglePlay()">⏸</button>
+        <button class="ctrl-btn" onclick="nextSong()">⏭</button>
+      </div>
+    </div>
+
+    <!-- Bluetooth -->
+    <div class="bt-card">
+      <div class="card-title">Bluetooth</div>
+      <div class="bt-inner">
+        <div class="bt-device">
+          <div class="bt-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4a8cc4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"/>
+            </svg>
+          </div>
+          <div>
+            <div class="bt-name" id="bt-name">AirPods Pro</div>
+            <div class="bt-type">Cuffie · A2DP</div>
+          </div>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:5px;">
+          <div class="bt-connected">
+            <div class="bt-dot"></div>
+            connesso
+          </div>
+          <div class="bt-signal">
+            <div class="bt-bar"></div>
+            <div class="bt-bar"></div>
+            <div class="bt-bar"></div>
+            <div class="bt-bar"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const songs = [
+  { title: "Pepper", artist: "Butthole Surfers" },
+  { title: "Electric Feel", artist: "MGMT" },
+  { title: "Midnight City", artist: "M83" },
+  { title: "Instant Crush", artist: "Daft Punk" },
+  { title: "Feel Good Inc.", artist: "Gorillaz" },
+];
+let songIdx = 0;
+let playing = true;
+
+function updateSong() {
+  document.getElementById('song-title').textContent = songs[songIdx].title;
+  document.getElementById('song-artist').textContent = songs[songIdx].artist;
+}
+function nextSong() { songIdx = (songIdx + 1) % songs.length; updateSong(); }
+function prevSong() { songIdx = (songIdx - 1 + songs.length) % songs.length; updateSong(); }
+function togglePlay() {
+  playing = !playing;
+  document.getElementById('play-btn').textContent = playing ? '⏸' : '▶';
+  const vinyl = document.querySelector('.vinyl');
+  vinyl.style.animationPlayState = playing ? 'running' : 'paused';
+}
+
+// Clock
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+}
+updateClock();
+setInterval(updateClock, 30000);
+
+// Speedo arc math
+const CX = 170, CY = 170, R = 128;
+const START_DEG = 210, SWEEP = 300, MAX_SPEED = 45;
+
+function deg2rad(d) { return d * Math.PI / 180; }
+function arcPath(start, end) {
+  const s = deg2rad(start - 90);
+  const e = deg2rad(end - 90);
+  const x1 = CX + R * Math.cos(s), y1 = CY + R * Math.sin(s);
+  const x2 = CX + R * Math.cos(e), y2 = CY + R * Math.sin(e);
+  const large = (end - start) > 180 ? 1 : 0;
+  return `M ${x1} ${y1} A ${R} ${R} 0 ${large} 1 ${x2} ${y2}`;
+}
+
+// Background arc (full)
+document.getElementById('arc-bg').setAttribute('d', arcPath(START_DEG, START_DEG + SWEEP));
+
+// Tick marks
+const ticksG = document.getElementById('ticks');
+const labelsG = document.getElementById('labels');
+for (let i = 0; i <= MAX_SPEED; i++) {
+  const pct = i / MAX_SPEED;
+  const angle = deg2rad(START_DEG + pct * SWEEP - 90);
+  const isMajor = i % 5 === 0;
+  const r1 = isMajor ? R - 18 : R - 12;
+  const x1 = CX + R * Math.cos(angle), y1 = CY + R * Math.sin(angle);
+  const x2 = CX + r1 * Math.cos(angle), y2 = CY + r1 * Math.sin(angle);
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+  line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+  line.setAttribute('stroke', isMajor ? '#2a4a5a' : '#1a2a35');
+  line.setAttribute('stroke-width', isMajor ? '2' : '1');
+  ticksG.appendChild(line);
+  if (isMajor && i % 10 === 0) {
+    const lr = R - 32;
+    const lx = CX + lr * Math.cos(angle), ly = CY + lr * Math.sin(angle);
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', lx); text.setAttribute('y', ly);
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('dominant-baseline', 'central');
+    text.setAttribute('fill', '#2a5060');
+    text.setAttribute('font-size', '11');
+    text.setAttribute('font-family', 'Orbitron, monospace');
+    text.textContent = i;
+    labelsG.appendChild(text);
+  }
+}
+
+// Speed simulation
+let currentSpeed = 0;
+let targetSpeed = 0;
+let totalDist = 0;
+let speedSamples = [];
+
+const throttle = document.getElementById('throttle');
+throttle.addEventListener('input', () => {
+  targetSpeed = parseInt(throttle.value);
+  const pct = targetSpeed / MAX_SPEED * 100;
+  throttle.style.setProperty('--pct', pct + '%');
+});
+
+function updateSpeedo(spd) {
+  const pct = Math.min(spd / MAX_SPEED, 1);
+  const fillEnd = START_DEG + pct * SWEEP;
+  document.getElementById('arc-fill').setAttribute('d', arcPath(START_DEG, fillEnd));
+  document.getElementById('arc-glow').setAttribute('d', arcPath(START_DEG, fillEnd));
+  document.getElementById('speed-display').textContent = Math.round(spd);
+  // Color shift at high speed
+  const col = spd > 38 ? '#e74c3c' : spd > 30 ? '#f39c12' : '#1a6a9a';
+  const glowCol = spd > 38 ? '#e74c3c' : spd > 30 ? '#f8c471' : '#7eb8d4';
+  document.getElementById('arc-fill').setAttribute('stroke', col);
+  document.getElementById('arc-glow').setAttribute('stroke', glowCol);
+  document.getElementById('speed-display').style.color = spd > 38 ? '#e74c3c' : spd > 30 ? '#f39c12' : '#fff';
+}
+
+let lastT = Date.now();
+function tick() {
+  const now = Date.now();
+  const dt = (now - lastT) / 1000;
+  lastT = now;
+  // Smooth approach
+  const accel = targetSpeed > currentSpeed ? 6 : 10;
+  const diff = targetSpeed - currentSpeed;
+  currentSpeed += Math.sign(diff) * Math.min(Math.abs(diff), accel * dt);
+  currentSpeed = Math.max(0, Math.min(MAX_SPEED, currentSpeed));
+  updateSpeedo(currentSpeed);
+  // Odometer
+  totalDist += currentSpeed * dt / 3600;
+  document.getElementById('odometer').textContent = totalDist.toFixed(1) + ' km';
+  // Avg speed
+  speedSamples.push(currentSpeed);
+  if (speedSamples.length > 200) speedSamples.shift();
+  const avg = speedSamples.reduce((a,b) => a+b, 0) / speedSamples.length;
+  document.getElementById('avg-speed').textContent = Math.round(avg) + ' km/h';
+  // Range
+  const range = Math.max(0, 75 - Math.round(totalDist));
+  document.getElementById('range-val').textContent = range + ' km';
+  requestAnimationFrame(tick);
+}
+tick();
+updateSpeedo(0);
+</script>
+</body>
+</html>
