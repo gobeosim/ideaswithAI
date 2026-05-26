@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CarPlay">
+<meta name="theme-color" content="#000">
+<title>CarPlay</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;}
+html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:-apple-system,'SF Pro Display','Helvetica Neue',sans-serif;-webkit-font-smoothing:antialiased;}
+.shell{width:100%;height:100dvh;display:flex;flex-direction:column;background:#000;}
+
+/* STATUS BAR */
+.sb{height:38px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:#000;flex-shrink:0;font-size:14px;font-weight:600;color:#fff;border-bottom:.5px solid rgba(255,255,255,0.1);}
+.sb-mid{position:absolute;left:50%;transform:translateX(-50%);font-size:12px;color:rgba(255,255,255,0.45);white-space:nowrap;}
+.sb-r{display:flex;align-items:center;gap:6px;font-size:12px;}
+
+/* MAIN SPLIT */
+.main{flex:1;display:flex;overflow:hidden;}
+
+/* SIDEBAR */
+.sidebar{width:92px;background:#111111;display:flex;flex-direction:column;align-items:center;padding:12px 0 10px;gap:0;flex-shrink:0;border-right:.5px solid rgba(255,255,255,0.08);overflow:hidden;z-index:10;}
+.app-wrap{display:flex;flex-direction:column;align-items:center;gap:3px;margin-bottom:6px;width:100%;}
+.app-btn{width:62px;height:62px;border-radius:15px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:transform .12s,filter .12s;position:relative;}
+.app-btn:active{transform:scale(.88);}
+.app-btn svg{width:62px;height:62px;display:block;border-radius:15px;}
+.app-btn.active{outline:2.5px solid #fff;outline-offset:2px;}
+.app-lbl{font-size:10px;font-weight:500;color:rgba(255,255,255,0.4);text-align:center;letter-spacing:.1px;}
+.sb-div{width:44px;height:.5px;background:rgba(255,255,255,0.1);margin:6px 0;}
+.clk{margin-top:auto;display:flex;flex-direction:column;align-items:center;padding-bottom:2px;gap:2px;}
+.clk-t{font-size:20px;font-weight:200;color:#fff;letter-spacing:-1px;line-height:1;}
+.clk-s{display:flex;flex-direction:column;align-items:center;}
+.clk-s span:first-child{font-size:16px;font-weight:700;color:#5ac8fa;line-height:1;}
+.clk-s span:last-child{font-size:9px;color:rgba(255,255,255,0.3);letter-spacing:.5px;}
+
+/* MAP */
+.map-area{flex:1;position:relative;overflow:hidden;background:#e8e0d8;}
+#lmap{width:100%;height:100%;}
+.leaflet-control-zoom,.leaflet-control-attribution{display:none!important;}
+
+/* SEARCH */
+.map-search{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:min(380px,calc(100% - 28px));z-index:600;}
+.s-box{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.97);border-radius:13px;padding:9px 12px;box-shadow:0 2px 20px rgba(0,0,0,0.25);}
+.s-box input{flex:1;background:transparent;border:none;outline:none;color:#000;font-size:15px;font-family:inherit;caret-color:#0a84ff;-webkit-user-select:text;user-select:text;}
+.s-box input::placeholder{color:rgba(0,0,0,0.3);}
+.s-ic{font-size:15px;color:rgba(0,0,0,0.4);flex-shrink:0;}
+.s-cl{font-size:14px;color:rgba(0,0,0,0.3);cursor:pointer;display:none;flex-shrink:0;line-height:1;}
+.s-res{background:rgba(255,255,255,0.98);border-radius:0 0 13px 13px;border-top:.5px solid rgba(0,0,0,0.08);max-height:200px;overflow-y:auto;display:none;box-shadow:0 8px 20px rgba(0,0,0,0.2);}
+.s-res::-webkit-scrollbar{display:none;}
+.s-item{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:.5px solid rgba(0,0,0,0.05);}
+.s-item:last-child{border-bottom:none;}
+.s-item:active{background:rgba(0,0,0,0.04);}
+.s-icon{font-size:15px;flex-shrink:0;}
+.s-name{font-size:14px;font-weight:500;color:#000;}
+.s-sub{font-size:11px;color:rgba(0,0,0,0.4);}
+
+/* MAP HUDS */
+.spd-hud{position:absolute;bottom:76px;left:12px;background:rgba(255,255,255,0.95);border-radius:12px;padding:7px 13px;z-index:500;display:flex;flex-direction:column;align-items:center;box-shadow:0 2px 10px rgba(0,0,0,0.15);}
+.spd-n{font-size:24px;font-weight:700;color:#000;line-height:1;}
+.spd-l{font-size:9px;color:rgba(0,0,0,0.4);font-weight:600;letter-spacing:.5px;}
+.loc-btn{position:absolute;bottom:76px;right:12px;width:42px;height:42px;background:rgba(255,255,255,0.95);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;z-index:500;box-shadow:0 2px 10px rgba(0,0,0,0.2);}
+.loc-btn:active{background:#f0f0f0;}
+.maps-open-btn{position:absolute;bottom:76px;right:62px;height:42px;background:#0a84ff;border-radius:12px;display:flex;align-items:center;justify-content:center;padding:0 12px;font-size:12px;font-weight:700;color:#fff;cursor:pointer;z-index:500;box-shadow:0 2px 10px rgba(10,132,255,0.4);white-space:nowrap;gap:5px;text-decoration:none;}
+.maps-open-btn:active{opacity:.85;}
+.map-hud{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(to top,rgba(0,0,0,0.7) 0%,rgba(0,0,0,0.4) 60%,transparent 100%);padding:18px 14px 10px;z-index:500;display:flex;align-items:flex-end;justify-content:space-between;}
+.hud-l .hlbl{font-size:10px;color:rgba(255,255,255,0.5);margin-bottom:2px;}
+.hud-l .haddr{font-size:14px;font-weight:600;color:#fff;}
+.hud-l .hcoord{font-size:10px;color:rgba(255,255,255,0.4);margin-top:1px;}
+.gps-pill{display:flex;align-items:center;gap:4px;background:rgba(48,209,88,0.2);border:.5px solid rgba(48,209,88,0.4);border-radius:20px;padding:4px 10px;font-size:11px;font-weight:600;color:#30d158;}
+.gps-pill.off{background:rgba(255,69,58,0.2);border-color:rgba(255,69,58,0.4);color:#ff453a;}
+
+/* PANELS */
+.panel{position:absolute;inset:0;background:rgba(10,10,14,0.98);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);display:none;flex-direction:column;z-index:900;}
+.panel.open{display:flex;}
+.ph{display:flex;align-items:center;gap:8px;padding:13px 16px 10px;border-bottom:.5px solid rgba(255,255,255,0.08);flex-shrink:0;}
+.ph-back{font-size:17px;color:#0a84ff;cursor:pointer;font-weight:500;padding:2px 6px 2px 0;display:flex;align-items:center;gap:3px;}
+.ph-back svg{width:10px;height:17px;}
+.ph-title{font-size:19px;font-weight:700;}
+.pb{flex:1;overflow-y:auto;padding:14px 16px;}
+.pb::-webkit-scrollbar{display:none;}
+
+/* PHONE */
+.dd{background:#1c1c1e;border-radius:14px;font-size:30px;font-weight:300;letter-spacing:5px;text-align:center;padding:14px 16px;min-height:64px;margin-bottom:10px;word-break:break-all;color:#fff;}
+.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:10px;}
+.k{background:#1c1c1e;border-radius:13px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 8px;cursor:pointer;font-size:24px;font-weight:300;line-height:1;}
+.k:active{background:#3a3a3c;}
+.k sub{font-size:9px;color:rgba(255,255,255,0.3);font-weight:600;letter-spacing:1.5px;margin-top:1px;display:block;}
+.ka{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:18px;}
+.kcall{background:#30d158;border-radius:13px;display:flex;align-items:center;justify-content:center;gap:7px;padding:14px;text-decoration:none;font-size:16px;font-weight:700;color:#000;}
+.kcall:active{opacity:.8;}
+.kdel{background:#1c1c1e;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;color:rgba(255,255,255,0.5);}
+.kdel:active{background:#3a3a3c;}
+.sec{font-size:12px;font-weight:700;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:.5px solid rgba(255,255,255,0.06);}
+.cav{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex-shrink:0;}
+.cn{font-size:15px;font-weight:500;}.cnum{font-size:12px;color:rgba(255,255,255,0.35);}
+.caction{margin-left:auto;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:17px;flex-shrink:0;}
+.ca-green{background:rgba(48,209,88,0.15);border:.5px solid rgba(48,209,88,0.25);}
+
+/* WHATSAPP */
+.wa-card{background:#1c1c1e;border-radius:14px;padding:14px;margin-bottom:12px;}
+.wa-card p{font-size:14px;color:rgba(255,255,255,0.6);line-height:1.6;}
+.btn-wa-open{display:flex;align-items:center;justify-content:center;gap:8px;background:#25d366;border-radius:13px;padding:15px;font-size:16px;font-weight:700;color:#000;text-decoration:none;margin-bottom:12px;}
+.btn-wa-open:active{opacity:.8;}
+.qr-title{font-size:12px;font-weight:700;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;}
+/* quick replies */
+.qr-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;}
+.qr-btn{background:#1c1c1e;border-radius:13px;padding:11px 10px;font-size:13px;font-weight:500;color:#fff;cursor:pointer;text-align:center;line-height:1.3;border:.5px solid rgba(255,255,255,0.07);}
+.qr-btn:active{background:#2c2c2e;}
+.qr-btn .qr-emoji{font-size:18px;display:block;margin-bottom:4px;}
+/* wa contact */
+.wa-crow{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:.5px solid rgba(255,255,255,0.06);}
+.wa-caction{margin-left:auto;display:flex;gap:8px;}
+.wa-c-msg{width:36px;height:36px;border-radius:50%;background:rgba(37,211,102,0.15);border:.5px solid rgba(37,211,102,0.25);display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:16px;}
+.wa-c-call{width:36px;height:36px;border-radius:50%;background:rgba(48,209,88,0.15);border:.5px solid rgba(48,209,88,0.25);display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:16px;}
+
+/* quick reply modal */
+.qr-modal{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);z-index:1000;display:none;align-items:flex-end;padding:16px;}
+.qr-modal.show{display:flex;}
+.qr-sheet{background:#1c1c1e;border-radius:18px;width:100%;padding:16px;max-height:80vh;overflow-y:auto;}
+.qr-sheet-title{font-size:16px;font-weight:700;margin-bottom:4px;}
+.qr-sheet-sub{font-size:13px;color:rgba(255,255,255,0.4);margin-bottom:14px;}
+.qr-list{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
+.qr-row{background:#2c2c2e;border-radius:12px;padding:13px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:14px;font-weight:500;}
+.qr-row:active{background:#3a3a3c;}
+.qr-row .qe{font-size:18px;}
+.qr-cancel{background:#2c2c2e;border-radius:12px;padding:14px;text-align:center;font-size:16px;font-weight:600;color:#ff453a;cursor:pointer;}
+.qr-cancel:active{background:#3a3a3c;}
+
+/* SPOTIFY */
+.sp-now{background:#1c1c1e;border-radius:16px;padding:16px;margin-bottom:12px;}
+.sp-trk{font-size:17px;font-weight:700;margin-bottom:2px;}
+.sp-art{font-size:13px;color:rgba(255,255,255,0.45);margin-bottom:12px;}
+.sp-bar{height:3px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden;margin-bottom:14px;}
+.sp-fill{height:100%;background:#1db954;border-radius:2px;width:40%;}
+.sp-ctrls{display:flex;justify-content:space-around;align-items:center;}
+.sp-ctrls a{color:rgba(255,255,255,0.8);text-decoration:none;font-size:28px;}
+.sp-big{font-size:44px;color:#1db954;}
+.sp-open{display:flex;align-items:center;justify-content:center;gap:8px;background:#1db954;border-radius:13px;padding:14px;font-size:15px;font-weight:700;color:#000;text-decoration:none;margin-bottom:10px;}
+.sp-open:active{opacity:.8;}
+.sp-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
+.sp-tile{display:flex;align-items:center;justify-content:center;gap:6px;background:rgba(29,185,84,0.12);border:.5px solid rgba(29,185,84,0.25);border-radius:12px;padding:13px;font-size:13px;font-weight:600;color:#1db954;text-decoration:none;}
+.sp-tile:active{background:rgba(29,185,84,0.2);}
+.sp-note{font-size:12px;color:rgba(255,255,255,0.25);text-align:center;line-height:1.6;}
+
+/* WEATHER */
+.w-hero{text-align:center;padding:2px 0 16px;}
+.w-em{font-size:60px;line-height:1;margin-bottom:4px;}
+.w-tmp{font-size:76px;font-weight:200;letter-spacing:-4px;line-height:1;}
+.w-desc{font-size:16px;color:rgba(255,255,255,0.55);margin-top:5px;}
+.w-rng{font-size:13px;color:rgba(255,255,255,0.3);margin-top:2px;}
+.wcards{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:4px;}
+.wcard{background:#1c1c1e;border-radius:13px;padding:13px;}
+.wcard.wf{grid-column:1/-1;}
+.wcl{font-size:10px;font-weight:700;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;}
+.wcv{font-size:22px;font-weight:300;}
+.wcs{font-size:11px;color:rgba(255,255,255,0.3);margin-top:1px;}
+.hrly{display:flex;gap:11px;overflow-x:auto;padding:8px 0 2px;}
+.hrly::-webkit-scrollbar{display:none;}
+.hit{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:44px;}
+.htm{font-size:10px;color:rgba(255,255,255,0.3);}
+.hem{font-size:17px;}
+.htv{font-size:13px;font-weight:600;}
+.loading{text-align:center;padding:40px;color:rgba(255,255,255,0.3);font-size:14px;}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- STATUS BAR -->
+<div class="sb" style="position:relative;">
+  <span id="sb-t">--:--</span>
+  <span class="sb-mid" id="sb-d"></span>
+  <div class="sb-r">
+    <span id="sb-gps" style="font-size:10px;"></span>
+    <span id="sb-bat">🔋</span>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- ═══ SIDEBAR ═══ -->
+<div class="sidebar">
+
+  <!-- MAPS -->
+  <div class="app-wrap">
+    <div class="app-btn active" id="btn-maps" onclick="showApp('maps')">
+      <svg viewBox="0 0 62 62" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="mg1" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#60d0f0"/>
+            <stop offset="45%" stop-color="#34c759"/>
+            <stop offset="100%" stop-color="#1e9e3e"/>
+          </linearGradient>
+          <linearGradient id="mg2" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#f5f5f0"/>
+            <stop offset="100%" stop-color="#e8e0d0"/>
+          </linearGradient>
+          <clipPath id="mc"><rect width="62" height="62" rx="14"/></clipPath>
+        </defs>
+        <rect width="62" height="62" rx="14" fill="url(#mg2)"/>
+        <!-- terrain patches -->
+        <polygon points="0,40 20,22 38,35 62,18 62,62 0,62" fill="#c8dba0" opacity=".7"/>
+        <polygon points="0,50 25,38 45,48 62,35 62,62 0,62" fill="#8ab870" opacity=".6"/>
+        <!-- roads -->
+        <path d="M0,38 Q15,33 28,38 Q42,43 62,34" stroke="#f5e070" stroke-width="5" fill="none" stroke-linecap="round"/>
+        <path d="M0,38 Q15,33 28,38 Q42,43 62,34" stroke="#f0d030" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-dasharray="6,4"/>
+        <path d="M22,0 Q24,20 26,38" stroke="#fff" stroke-width="6" fill="none" stroke-linecap="round"/>
+        <path d="M22,0 Q24,20 26,38" stroke="#e0d8c8" stroke-width="2" fill="none" stroke-linecap="round"/>
+        <!-- location pin -->
+        <circle cx="31" cy="19" r="9" fill="#ff3b30"/>
+        <circle cx="31" cy="19" r="3.5" fill="#fff"/>
+        <path d="M27,24 Q31,32 31,32 Q31,32 35,24" fill="#ff3b30"/>
+        <!-- user dot -->
+        <circle cx="26" cy="38" r="4" fill="#fff" stroke="#0a84ff" stroke-width="2"/>
+      </svg>
+    </div>
+    <div class="app-lbl">Mappe</div>
+  </div>
+
+  <div class="sb-div"></div>
+
+  <!-- PHONE -->
+  <div class="app-wrap">
+    <div class="app-btn" id="btn-phone" onclick="showApp('phone')">
+      <svg viewBox="0 0 62 62" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="pg" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#4cd964"/>
+            <stop offset="100%" stop-color="#25a244"/>
+          </linearGradient>
+        </defs>
+        <rect width="62" height="62" rx="14" fill="url(#pg)"/>
+        <path d="M42.8 39.6c-.5-.5-1.5-1.1-2.8-1.8-1.3-.7-2.4-1.1-3.1-.8-.5.2-.9.7-1.5 1.4-.6.7-1.1 1.1-1.7 1.1-.4 0-.9-.2-1.6-.7-2.1-1.3-4.6-3.8-6-6-.4-.6-.6-1.2-.6-1.7 0-.8.5-1.5 1.2-2.2.7-.7 1.3-1.4 1.3-2.2 0-1.2-1.5-3.9-2.6-5-.7-.7-1.6-1.1-2.6-1.1-1.9 0-5.4 2.6-5.4 4.8 0 .5.1 1 .2 1.5 1 3.3 3.2 8.1 7.4 12.3 4.2 4.2 9 6.4 12.3 7.4.5.2 1 .2 1.5.2 2.2 0 4.8-3.5 4.8-5.4 0-1-.4-1.9-1.1-2.6z" fill="#fff"/>
+      </svg>
+    </div>
+    <div class="app-lbl">Telefono</div>
+  </div>
+
+  <!-- SPOTIFY -->
+  <div class="app-wrap">
+    <div class="app-btn" id="btn-spotify" onclick="showApp('spotify')">
+      <svg viewBox="0 0 62 62" xmlns="http://www.w3.org/2000/svg">
+        <rect width="62" height="62" rx="14" fill="#191414"/>
+        <circle cx="31" cy="31" r="19" fill="#1db954"/>
+        <!-- spotify waves -->
+        <path d="M20.5 24.5 C26.5 22.5 33 22.8 38.5 25.8" stroke="#fff" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+        <path d="M21.5 30 C27 28.3 33 28.5 37.5 31" stroke="#fff" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+        <path d="M23 35.5 C27.5 34.2 32.5 34.4 36 36.5" stroke="#fff" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+      </svg>
+    </div>
+    <div class="app-lbl">Spotify</div>
+  </div>
+
+  <!-- WHATSAPP -->
+  <div class="app-wrap">
+    <div class="app-btn" id="btn-whatsapp" onclick="showApp('whatsapp')">
+      <svg viewBox="0 0 62 62" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="wag" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#61fd7d"/>
+            <stop offset="100%" stop-color="#2bb826"/>
+          </linearGradient>
+        </defs>
+        <rect width="62" height="62" rx="14" fill="url(#wag)"/>
+        <!-- white bg circle -->
+        <circle cx="31" cy="30" r="20" fill="#fff"/>
+        <!-- WA phone icon inside -->
+        <path d="M31 11c-10.5 0-19 8.5-19 19 0 3.4.9 6.7 2.6 9.5L12 51l11.8-3.1c2.7 1.4 5.7 2.2 9.2 2.2 10.5 0 19-8.5 19-19S41.5 11 31 11z" fill="#25d366"/>
+        <path d="M31 13.5c-9.1 0-16.5 7.4-16.5 16.5 0 3 .8 5.9 2.3 8.4l-2.3 8.4 8.6-2.2c2.4 1.3 5.1 2.1 8 2.1 9.1 0 16.5-7.4 16.5-16.5S40.1 13.5 31 13.5z" fill="#25d366"/>
+        <path d="M40.5 36.8c-.3-.5-1.1-.8-2.3-1.4-1.2-.6-2.2-.9-2.6-.7-.3.2-.5.5-.9 1.1-.4.6-.8.7-1.4.4-2.2-1.1-4-2.9-5.1-4.7-.3-.6-.1-.9.2-1.3.4-.4.6-.7.8-1.1.3-.5.1-.9-.1-1.3-.2-.4-1.3-3.1-1.8-4.2-.5-1-.9-.9-1.3-.9h-1.1c-.4 0-1 .2-1.6.8-.5.6-1.8 1.8-1.8 4.4 0 2.6 1.9 4.6 2.1 5 .2.4 3.8 5.9 9.4 8.2 1.3.6 2.3.9 3.1 1.1 1.3.4 2.5.3 3.5.2 1.1-.2 3.2-1.3 3.7-2.5.5-1.2.5-2.3.3-2.5-.1-.1-.2-.2-.5-.3z" fill="#fff"/>
+      </svg>
+    </div>
+    <div class="app-lbl">WhatsApp</div>
+  </div>
+
+  <div class="sb-div"></div>
+
+  <!-- WEATHER -->
+  <div class="app-wrap">
+    <div class="app-btn" id="btn-weather" onclick="showApp('weather')">
+      <svg viewBox="0 0 62 62" id="weather-svg" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="wthg" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#1b7fe8"/>
+            <stop offset="100%" stop-color="#4fc3f7"/>
+          </linearGradient>
+        </defs>
+        <rect width="62" height="62" rx="14" fill="url(#wthg)"/>
+        <circle cx="38" cy="20" r="9" fill="#ffd60a"/>
+        <!-- sun rays -->
+        <line x1="38" y1="7" x2="38" y2="4" stroke="#ffd60a" stroke-width="2.5" stroke-linecap="round"/>
+        <line x1="47" y1="11" x2="49" y2="9" stroke="#ffd60a" stroke-width="2.5" stroke-linecap="round"/>
+        <line x1="51" y1="20" x2="54" y2="20" stroke="#ffd60a" stroke-width="2.5" stroke-linecap="round"/>
+        <!-- cloud -->
+        <circle cx="21" cy="34" r="9" fill="#fff"/>
+        <circle cx="29" cy="29" r="11" fill="#fff"/>
+        <circle cx="39" cy="32" r="8" fill="#fff"/>
+        <rect x="12" y="34" width="35" height="11" rx="5" fill="#fff"/>
+      </svg>
+    </div>
+    <div class="app-lbl" id="w-lbl">Meteo</div>
+  </div>
+
+  <!-- CLOCK + SPEED -->
+  <div class="clk">
+    <div class="clk-t" id="side-t">--:--</div>
+    <div class="clk-s">
+      <span id="side-spd">0</span>
+      <span>km/h</span>
+    </div>
+  </div>
+
+</div><!-- /sidebar -->
+
+<!-- ═══ MAP AREA ═══ -->
+<div class="map-area">
+  <div id="lmap"></div>
+
+  <!-- Search -->
+  <div class="map-search">
+    <div class="s-box">
+      <span class="s-ic">🔍</span>
+      <input id="s-inp" type="text" placeholder="Cerca un luogo..." autocomplete="off" autocorrect="off" spellcheck="false"/>
+      <span class="s-cl" id="s-cl" onclick="clearSearch()">✕</span>
+    </div>
+    <div class="s-res" id="s-res"></div>
+  </div>
+
+  <!-- Speed -->
+  <div class="spd-hud"><div class="spd-n" id="m-spd">0</div><div class="spd-l">KM/H</div></div>
+
+  <!-- Open Apple Maps -->
+  <a id="open-apple-maps" href="maps://?q=posizione+attuale" class="maps-open-btn" target="_blank">
+    <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 0C4.2 0 2 2.2 2 5c0 3.5 5 9 5 9s5-5.5 5-9C12 2.2 9.8 0 7 0zm0 7a2 2 0 110-4 2 2 0 010 4z" fill="#fff"/></svg>
+    Apri in Apple Maps
+  </a>
+
+  <!-- Locate -->
+  <div class="loc-btn" onclick="centerMap()">📍</div>
+
+  <!-- Bottom HUD -->
+  <div class="map-hud">
+    <div class="hud-l">
+      <div class="hlbl">Posizione attuale</div>
+      <div class="haddr" id="hud-addr">Acquisendo GPS...</div>
+      <div class="hcoord" id="hud-coord"></div>
+    </div>
+    <div id="gps-pill" class="gps-pill off">✕ GPS</div>
+  </div>
+
+  <!-- ══ PHONE PANEL ══ -->
+  <div id="panel-phone" class="panel">
+    <div class="ph">
+      <div class="ph-back" onclick="closePanel('phone')"><svg viewBox="0 0 10 17" fill="none"><path d="M9 1L1 8.5L9 16" stroke="#0a84ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Indietro</div>
+      <div class="ph-title">Telefono</div>
+    </div>
+    <div class="pb">
+      <div class="dd" id="dd">&#8203;</div>
+      <div class="kp">
+        <div class="k" onclick="kp('1')">1<sub>&nbsp;</sub></div>
+        <div class="k" onclick="kp('2')">2<sub>ABC</sub></div>
+        <div class="k" onclick="kp('3')">3<sub>DEF</sub></div>
+        <div class="k" onclick="kp('4')">4<sub>GHI</sub></div>
+        <div class="k" onclick="kp('5')">5<sub>JKL</sub></div>
+        <div class="k" onclick="kp('6')">6<sub>MNO</sub></div>
+        <div class="k" onclick="kp('7')">7<sub>PQRS</sub></div>
+        <div class="k" onclick="kp('8')">8<sub>TUV</sub></div>
+        <div class="k" onclick="kp('9')">9<sub>WXYZ</sub></div>
+        <div class="k" onclick="kp('*')">＊<sub>&nbsp;</sub></div>
+        <div class="k" onclick="kp('0')">0<sub>+</sub></div>
+        <div class="k" onclick="kp('#')">#<sub>&nbsp;</sub></div>
+      </div>
+      <div class="ka">
+        <a id="call-a" href="tel:" class="kcall" onclick="return !!dialNum">
+          <svg width="20" height="20" viewBox="0 0 20 20"><path d="M18.2 14.2c-.6-.6-3.7-2.4-4.7-2.4-.6 0-1.1.4-1.6.9-.6.7-1.1 1.2-1.7 1.2-.3 0-.8-.2-1.4-.6C6.7 12 4.6 9.9 3.4 7.8c-.4-.6-.6-1.1-.6-1.5 0-.6.5-1.1 1.1-1.7.5-.5.9-1 .9-1.6 0-1-1.8-4.1-2.4-4.7-.5-.5-1.1-.8-1.8-.8-1.4 0-4.1 2-4.1 3.7v.9C-3 5.8-.8 10.4 3.4 14.6c4.2 4.2 8.8 6.4 11.7 6.8.3 0 .6.1.9.1 1.7 0 3.7-2.7 3.7-4.1 0-.7-.3-1.3-.8-1.8l-.7.6z" fill="#000"/></svg>
+          Chiama
+        </a>
+        <div class="kdel" onclick="kpDel()">⌫</div>
+      </div>
+      <div class="sec">Contatti rapidi</div>
+      <!-- ✏️ MODIFICA QUI I TUOI CONTATTI -->
+      <div class="crow">
+        <div class="cav" style="background:rgba(255,69,58,.18);color:#ff453a;">MB</div>
+        <div><div class="cn">Marco B.</div><div class="cnum">+39 333 1234567</div></div>
+        <a class="caction ca-green" href="tel:+393331234567">📞</a>
+      </div>
+      <div class="crow">
+        <div class="cav" style="background:rgba(90,200,250,.18);color:#5ac8fa;">SR</div>
+        <div><div class="cn">Sara R.</div><div class="cnum">+39 347 9876543</div></div>
+        <a class="caction ca-green" href="tel:+393479876543">📞</a>
+      </div>
+      <div class="crow">
+        <div class="cav" style="background:rgba(48,209,88,.18);color:#30d158;">LP</div>
+        <div><div class="cn">Luca P.</div><div class="cnum">+39 320 5551234</div></div>
+        <a class="caction ca-green" href="tel:+393205551234">📞</a>
+      </div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.2);text-align:center;margin-top:14px;">Modifica i contatti nel codice HTML (cerca "CONTATTI")</div>
+    </div>
+  </div>
+
+  <!-- ══ SPOTIFY PANEL ══ -->
+  <div id="panel-spotify" class="panel">
+    <div class="ph">
+      <div class="ph-back" onclick="closePanel('spotify')"><svg viewBox="0 0 10 17" fill="none"><path d="M9 1L1 8.5L9 16" stroke="#0a84ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Indietro</div>
+      <div class="ph-title">Spotify</div>
+    </div>
+    <div class="pb">
+      <div class="sp-now">
+        <div class="sp-trk">Apri Spotify sul telefono</div>
+        <div class="sp-art">Poi usa i controlli qui</div>
+        <div class="sp-bar"><div class="sp-fill"></div></div>
+        <div class="sp-ctrls">
+          <a href="spotify:prev">⏮️</a>
+          <a href="spotify:play" class="sp-big">▶️</a>
+          <a href="spotify:next">⏭️</a>
+        </div>
+      </div>
+      <a href="spotify:" class="sp-open">🎵 &nbsp;Apri Spotify</a>
+      <div class="sp-grid">
+        <a href="spotify:search:road%20trip" class="sp-tile">🚗 Road trip</a>
+        <a href="spotify:search:chill%20vibes" class="sp-tile">😌 Chill</a>
+        <a href="spotify:search:anni%2080%20italiani" class="sp-tile">🕺 Anni 80</a>
+        <a href="spotify:search:musica%20da%20guidare" class="sp-tile">🎶 Guida</a>
+      </div>
+      <div class="sp-note">Tocca i pulsanti per aprire Spotify direttamente.</div>
+    </div>
+  </div>
+
+  <!-- ══ WHATSAPP PANEL ══ -->
+  <div id="panel-whatsapp" class="panel">
+    <div class="ph">
+      <div class="ph-back" onclick="closePanel('whatsapp')"><svg viewBox="0 0 10 17" fill="none"><path d="M9 1L1 8.5L9 16" stroke="#0a84ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Indietro</div>
+      <div class="ph-title">WhatsApp</div>
+    </div>
+    <div class="pb">
+      <a href="whatsapp://" class="btn-wa-open">
+        <svg width="20" height="20" viewBox="0 0 20 20"><path d="M10 0C4.5 0 0 4.5 0 10c0 1.8.5 3.5 1.3 5L0 20l5.2-1.3C6.7 19.5 8.3 20 10 20c5.5 0 10-4.5 10-10S15.5 0 10 0z" fill="#000" opacity=".3"/><path d="M10 1.5C5.3 1.5 1.5 5.3 1.5 10c0 1.6.4 3.2 1.2 4.5l-1.2 4.5 4.6-1.2C7.4 18.5 8.7 19 10 19 14.7 19 18.5 15.2 18.5 10S14.7 1.5 10 1.5z" fill="#25d366"/><path d="M14.5 12.3c-.2-.3-.7-.5-1.5-.9-.8-.4-1.4-.6-1.7-.4-.2.1-.3.3-.6.7-.3.4-.5.4-.9.2-1.3-.7-2.5-1.8-3.2-3-.2-.4-.1-.6.1-.8.2-.2.4-.4.5-.7.2-.3.1-.5-.1-.8-.1-.2-.8-2-1.1-2.7-.3-.7-.6-.6-.8-.6h-.7c-.2 0-.6.1-1 .5C4.2 4.3 3.2 5.2 3.2 6.9c0 1.7 1.2 3.1 1.4 3.3.2.2 2.4 3.8 5.9 5.2.8.4 1.5.6 2 .7.8.2 1.6.2 2.2.1.7-.1 2-.8 2.3-1.6.3-.8.3-1.4.2-1.6-.1-.1-.2-.2-.4-.3l.7-.4z" fill="#fff"/></svg>
+        Apri WhatsApp
+      </a>
+
+      <!-- RISPOSTE RAPIDE -->
+      <div class="sec">Risposte rapide</div>
+      <div class="qr-grid">
+        <div class="qr-btn" onclick="openQR('Sto guidando 🚗')"><span class="qr-emoji">🚗</span>Sto guidando</div>
+        <div class="qr-btn" onclick="openQR('Arrivo tra 10 minuti ⏱️')"><span class="qr-emoji">⏱️</span>Arrivo tra 10 min</div>
+        <div class="qr-btn" onclick="openQR('Arrivo tra 30 minuti 🕐')"><span class="qr-emoji">🕐</span>Arrivo tra 30 min</div>
+        <div class="qr-btn" onclick="openQR('Ti richiamo appena posso 📱')"><span class="qr-emoji">📱</span>Ti richiamo</div>
+        <div class="qr-btn" onclick="openQR('Sono in macchina, non posso rispondere 🔇')"><span class="qr-emoji">🔇</span>Non posso ora</div>
+        <div class="qr-btn" onclick="openQR('Ok! 👍')"><span class="qr-emoji">👍</span>Ok!</div>
+      </div>
+
+      <div class="sec">Contatti WhatsApp</div>
+      <!-- ✏️ MODIFICA QUI I CONTATTI WHATSAPP -->
+      <div class="wa-crow">
+        <div class="cav" style="background:rgba(37,211,102,.18);color:#25d366;">MB</div>
+        <div><div class="cn">Marco B.</div><div class="cnum">+39 333 1234567</div></div>
+        <div class="wa-caction">
+          <div class="wa-c-msg" onclick="openQRForContact('https://wa.me/393331234567')">💬</div>
+          <a class="wa-c-call" href="https://wa.me/393331234567?call=true">📞</a>
+        </div>
+      </div>
+      <div class="wa-crow">
+        <div class="cav" style="background:rgba(37,211,102,.18);color:#25d366;">SR</div>
+        <div><div class="cn">Sara R.</div><div class="cnum">+39 347 9876543</div></div>
+        <div class="wa-caction">
+          <div class="wa-c-msg" onclick="openQRForContact('https://wa.me/393479876543')">💬</div>
+          <a class="wa-c-call" href="https://wa.me/393479876543?call=true">📞</a>
+        </div>
+      </div>
+      <div class="wa-crow">
+        <div class="cav" style="background:rgba(37,211,102,.18);color:#25d366;">LP</div>
+        <div><div class="cn">Luca P.</div><div class="cnum">+39 320 5551234</div></div>
+        <div class="wa-caction">
+          <div class="wa-c-msg" onclick="openQRForContact('https://wa.me/393205551234')">💬</div>
+          <a class="wa-c-call" href="https://wa.me/393205551234?call=true">📞</a>
+        </div>
+      </div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.2);text-align:center;margin-top:14px;">Modifica i contatti nel codice HTML</div>
+    </div>
+  </div>
+
+  <!-- ══ WEATHER PANEL ══ -->
+  <div id="panel-weather" class="panel">
+    <div class="ph">
+      <div class="ph-back" onclick="closePanel('weather')"><svg viewBox="0 0 10 17" fill="none"><path d="M9 1L1 8.5L9 16" stroke="#0a84ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Indietro</div>
+      <div class="ph-title">Meteo</div>
+    </div>
+    <div class="pb" id="w-content"><div class="loading">⏳ Caricamento...</div></div>
+  </div>
+
+</div><!-- /map-area -->
+</div><!-- /main -->
+
+<!-- QUICK REPLY MODAL -->
+<div class="qr-modal" id="qr-modal" onclick="closeQRModal(event)">
+  <div class="qr-sheet" onclick="event.stopPropagation()">
+    <div class="qr-sheet-title">Risposte rapide</div>
+    <div class="qr-sheet-sub" id="qr-sub">Scegli una risposta da inviare</div>
+    <div class="qr-list">
+      <div class="qr-row" onclick="sendQR('Sto guidando 🚗')"><span class="qe">🚗</span>Sto guidando</div>
+      <div class="qr-row" onclick="sendQR('Arrivo tra 10 minuti ⏱️')"><span class="qe">⏱️</span>Arrivo tra 10 minuti</div>
+      <div class="qr-row" onclick="sendQR('Arrivo tra 30 minuti 🕐')"><span class="qe">🕐</span>Arrivo tra 30 minuti</div>
+      <div class="qr-row" onclick="sendQR('Ti richiamo appena posso 📱')"><span class="qe">📱</span>Ti richiamo appena posso</div>
+      <div class="qr-row" onclick="sendQR('Sono in macchina, non posso rispondere ora 🔇')"><span class="qe">🔇</span>Sono in macchina</div>
+      <div class="qr-row" onclick="sendQR('Ok! 👍')"><span class="qe">👍</span>Ok!</div>
+      <div class="qr-row" onclick="sendQR('Sono arrivato/a! 🏁')"><span class="qe">🏁</span>Sono arrivato!</div>
+      <div class="qr-row" onclick="sendQR('In ritardo di circa 15 minuti, scusa! ⏳')"><span class="qe">⏳</span>In ritardo ~15 min</div>
+    </div>
+    <div class="qr-cancel" onclick="document.getElementById('qr-modal').classList.remove('show')">Annulla</div>
+  </div>
+</div>
+
+</div><!-- /shell -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+'use strict';
+
+/* ── CLOCK ── */
+function tick(){
+  const n=new Date(),p=x=>String(x).padStart(2,'0');
+  const t=p(n.getHours())+':'+p(n.getMinutes());
+  document.getElementById('sb-t').textContent=t;
+  document.getElementById('side-t').textContent=t;
+  const D=['Dom','Lun','Mar','Mer','Gio','Ven','Sab'],M=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+  document.getElementById('sb-d').textContent=D[n.getDay()]+' '+n.getDate()+' '+M[n.getMonth()];
+}
+tick();setInterval(tick,10000);
+
+/* ── BATTERY ── */
+if(navigator.getBattery)navigator.getBattery().then(b=>{
+  const p=Math.round(b.level*100);
+  document.getElementById('sb-bat').textContent=(b.charging?'⚡':p<20?'🔴':'🔋')+p+'%';
+});
+
+/* ── APP NAV ── */
+function showApp(name){
+  ['maps','phone','spotify','whatsapp','weather'].forEach(a=>{
+    const b=document.getElementById('btn-'+a);if(b)b.classList.remove('active');
+  });
+  const bb=document.getElementById('btn-'+name);if(bb)bb.classList.add('active');
+  if(name==='maps'){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('open'));return;}
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('open'));
+  const panel=document.getElementById('panel-'+name);
+  if(panel)panel.classList.add('open');
+}
+function closePanel(name){
+  const p=document.getElementById('panel-'+name);if(p)p.classList.remove('open');
+  document.querySelectorAll('.app-btn').forEach(b=>b.classList.remove('active'));
+  const mb=document.getElementById('btn-maps');if(mb)mb.classList.add('active');
+}
+
+/* ── MAP ── */
+let lmap=null,mkr=null,accC=null,lat=null,lon=null,wDone=false;
+lmap=L.map('lmap',{zoomControl:false,attributionControl:false}).setView([45.4654,9.1859],14);
+// Apple Maps-style light tile
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(lmap);
+
+if(navigator.geolocation){
+  navigator.geolocation.watchPosition(onPos,onPosErr,{enableHighAccuracy:true,maximumAge:4000,timeout:20000});
+  navigator.geolocation.getCurrentPosition(onPos,onPosErr,{enableHighAccuracy:false,timeout:10000});
+} else onPosErr();
+
+function onPos(p){
+  lat=p.coords.latitude;lon=p.coords.longitude;
+  const spd=p.coords.speed,kmh=spd!=null?Math.round(spd*3.6):0;
+  document.getElementById('m-spd').textContent=kmh;
+  document.getElementById('side-spd').textContent=kmh;
+  const pill=document.getElementById('gps-pill');
+  pill.textContent='● GPS live';pill.className='gps-pill';
+  document.getElementById('sb-gps').innerHTML='<span style="color:#30d158;font-size:10px;">● GPS</span>';
+  // Update Apple Maps link
+  document.getElementById('open-apple-maps').href='maps://?q=mia+posizione&ll='+lat+','+lon;
+  // marker
+  const ic=L.divIcon({html:'<div style="width:18px;height:18px;background:#0a84ff;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 4px rgba(10,132,255,0.3);"></div>',iconSize:[18,18],iconAnchor:[9,9],className:''});
+  if(!mkr){mkr=L.marker([lat,lon],{icon:ic}).addTo(lmap);lmap.setView([lat,lon],16);}
+  else mkr.setLatLng([lat,lon]);
+  if(accC)lmap.removeLayer(accC);
+  accC=L.circle([lat,lon],{radius:p.coords.accuracy,color:'#0a84ff',fillColor:'#0a84ff',fillOpacity:0.07,weight:1}).addTo(lmap);
+  const cs=lat.toFixed(5)+'°N  '+lon.toFixed(5)+'°E';
+  document.getElementById('hud-coord').textContent=cs;
+  fetch('https://nominatim.openstreetmap.org/reverse?lat='+lat+'&lon='+lon+'&format=json&accept-language=it')
+    .then(r=>r.json()).then(d=>{
+      const a=d.address||{};
+      const road=a.road||a.pedestrian||a.path||'';
+      const city=a.city||a.town||a.village||a.municipality||'';
+      const addr=[road,city].filter(Boolean).join(', ')||'Posizione rilevata';
+      document.getElementById('hud-addr').textContent=addr;
+    }).catch(()=>document.getElementById('hud-addr').textContent=cs);
+  if(!wDone)loadWeather(lat,lon);
+}
+function onPosErr(){
+  const b=document.getElementById('gps-pill');b.textContent='✕ GPS negato';b.className='gps-pill off';
+  document.getElementById('hud-addr').textContent='Permetti la posizione nel browser';
+  document.getElementById('sb-gps').innerHTML='<span style="color:#ff453a;font-size:10px;">✕</span>';
+  if(!wDone)loadWeather(45.4654,9.1859);
+}
+function centerMap(){if(lmap&&lat)lmap.setView([lat,lon],16);}
+
+/* ── SEARCH ── */
+const si=document.getElementById('s-inp'),sr=document.getElementById('s-res'),sc=document.getElementById('s-cl');
+let st=null;
+si.addEventListener('input',function(){
+  const q=this.value.trim();sc.style.display=q?'block':'none';
+  clearTimeout(st);if(q.length<2){sr.style.display='none';return;}
+  st=setTimeout(()=>doSearch(q),400);
+});
+si.addEventListener('focus',()=>{if(si.value.trim().length>=2)sr.style.display='block';});
+document.addEventListener('click',e=>{if(!e.target.closest('.map-search'))sr.style.display='none';});
+
+function doSearch(q){
+  const vp=lat?`&viewbox=${lon-.1},${lat+.1},${lon+.1},${lat-.1}&bounded=0`:'';
+  fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(q)+'&format=json&limit=6&accept-language=it'+vp)
+    .then(r=>r.json()).then(res=>{
+      if(!res.length){sr.innerHTML='<div class="s-item"><span class="s-name" style="color:rgba(0,0,0,0.4);">Nessun risultato</span></div>';sr.style.display='block';return;}
+      sr.innerHTML=res.map(r=>{
+        const ic=placeIcon(r.type,r.class);
+        const name=r.display_name.split(',').slice(0,2).join(',').trim();
+        const sub=r.display_name.split(',').slice(2,4).join(',').trim();
+        return `<div class="s-item" onclick="goPlace(${r.lat},${r.lon},'${name.replace(/'/g,"\\'")}')"><span class="s-icon">${ic}</span><div><div class="s-name">${name}</div><div class="s-sub">${sub}</div></div></div>`;
+      }).join('');
+      sr.style.display='block';
+    }).catch(()=>sr.style.display='none');
+}
+function placeIcon(t,c){
+  if(c==='amenity'){if(['restaurant','cafe','bar','fast_food'].includes(t))return'🍽️';if(['hospital','clinic'].includes(t))return'🏥';if(t==='fuel')return'⛽';if(t==='parking')return'🅿️';if(t==='pharmacy')return'💊';if(['bank','atm'].includes(t))return'🏦';return'📍';}
+  if(c==='highway')return'🛣️';if(c==='tourism')return'🏛️';if(c==='shop')return'🛍️';if(c==='natural')return'🌿';return'📍';
+}
+function goPlace(la,lo,name){
+  lmap.setView([parseFloat(la),parseFloat(lo)],16);
+  const ic=L.divIcon({html:'<div style="width:14px;height:14px;background:#ff3b30;border-radius:50%;border:2.5px solid #fff;box-shadow:0 0 10px rgba(255,59,48,.6);"></div>',iconSize:[14,14],iconAnchor:[7,7],className:''});
+  L.marker([parseFloat(la),parseFloat(lo)],{icon:ic}).addTo(lmap)
+    .bindPopup('<b style="font-size:13px;">'+name+'</b>',{closeButton:false}).openPopup();
+  // Update apple maps link
+  document.getElementById('open-apple-maps').href='maps://?q='+encodeURIComponent(name)+'&ll='+la+','+lo;
+  clearSearch();
+}
+function clearSearch(){si.value='';sr.style.display='none';sc.style.display='none';}
+
+/* ── WEATHER ── */
+const WD={0:'Sereno',1:'Prev. sereno',2:'Parz. nuvoloso',3:'Nuvoloso',45:'Nebbia',48:'Nebbia',51:'Pioggerella',53:'Pioggerella',55:'Pioggerella intensa',61:'Pioggia leggera',63:'Pioggia',65:'Pioggia intensa',71:'Neve leggera',73:'Neve',75:'Neve intensa',80:'Rovesci',81:'Rovesci',82:'Rovesci forti',95:'Temporale',96:'Temporale',99:'Temporale forte'};
+const WE={0:'☀️',1:'🌤️',2:'⛅',3:'☁️',45:'🌫️',48:'🌫️',51:'🌦️',53:'🌦️',55:'🌧️',61:'🌧️',63:'🌧️',65:'🌧️',71:'🌨️',73:'❄️',75:'❄️',80:'🌦️',81:'🌧️',82:'⛈️',95:'⛈️',96:'⛈️',99:'⛈️'};
+const WC={0:'#ff9f00',1:'#ff9f00',2:'#5ac8fa',3:'#8e8e93',45:'#8e8e93',48:'#8e8e93',51:'#5ac8fa',53:'#5ac8fa',55:'#0a84ff',61:'#0a84ff',63:'#0a84ff',65:'#0a84ff',71:'#e5e5ea',73:'#e5e5ea',75:'#e5e5ea',80:'#0a84ff',81:'#0a84ff',82:'#5e5ce6',95:'#5e5ce6',96:'#5e5ce6',99:'#5e5ce6'};
+
+function loadWeather(la,lo){
+  wDone=true;
+  fetch('https://api.open-meteo.com/v1/forecast?latitude='+la+'&longitude='+lo+'&current=temperature_2m,weathercode,windspeed_10m,relativehumidity_2m,apparent_temperature&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_sum&hourly=temperature_2m,weathercode&timezone=auto&forecast_days=1')
+    .then(r=>r.json()).then(renderWeather)
+    .catch(()=>{document.getElementById('w-content').innerHTML='<div class="loading" style="color:#ff453a;">❌ Errore</div>';});
+}
+function renderWeather(d){
+  const c=d.current,dy=d.daily,hr=d.hourly;
+  const wc=c.weathercode,temp=Math.round(c.temperature_2m),feels=Math.round(c.apparent_temperature);
+  const tmax=Math.round(dy.temperature_2m_max[0]),tmin=Math.round(dy.temperature_2m_min[0]);
+  const desc=WD[wc]||'Varia',emoji=WE[wc]||'🌤️',col=WC[wc]||'#5ac8fa';
+  const wind=Math.round(c.windspeed_10m),hum=c.relativehumidity_2m,rain=(dy.precipitation_sum[0]||0).toFixed(1);
+  document.getElementById('w-lbl').textContent=temp+'°';
+  const nowH=new Date().getHours();
+  let hh='';
+  for(let i=nowH;i<Math.min(nowH+7,hr.time.length);i++){
+    const lbl=i===nowH?'Ora':hr.time[i].split('T')[1].slice(0,5);
+    hh+=`<div class="hit"><div class="htm">${lbl}</div><div class="hem">${WE[hr.weathercode[i]]||'🌤️'}</div><div class="htv">${Math.round(hr.temperature_2m[i])}°</div></div>`;
+  }
+  document.getElementById('w-content').innerHTML=
+    `<div class="w-hero"><div class="w-em">${emoji}</div><div class="w-tmp" style="color:${col};">${temp}°</div><div class="w-desc">${desc}</div><div class="w-rng">Percepita ${feels}° · Min ${tmin}° Max ${tmax}°</div></div>`
+    +`<div class="wcards"><div class="wcard wf"><div class="wcl">Prossime ore</div><div class="hrly">${hh}</div></div>`
+    +`<div class="wcard"><div class="wcl">Vento</div><div class="wcv">${wind}<span style="font-size:13px"> km/h</span></div><div class="wcs">${wind<15?'Leggero':wind<35?'Moderato':'Forte'}</div></div>`
+    +`<div class="wcard"><div class="wcl">Umidità</div><div class="wcv">${hum}<span style="font-size:13px">%</span></div><div class="wcs">${hum>70?'Alta':hum>40?'Moderata':'Bassa'}</div></div>`
+    +`<div class="wcard"><div class="wcl">Pioggia</div><div class="wcv">${rain}<span style="font-size:13px"> mm</span></div><div class="wcs">${rain>5?'Significativa':rain>0?'Leggera':'Assente'}</div></div>`
+    +`<div class="wcard"><div class="wcl">Max oggi</div><div class="wcv">${tmax}°</div><div class="wcs">Min ${tmin}°</div></div></div>`;
+}
+
+/* ── DIALER ── */
+let dialNum='';
+function kp(d){dialNum+=d;document.getElementById('dd').textContent=dialNum||'\u200b';document.getElementById('call-a').href='tel:'+dialNum;}
+function kpDel(){dialNum=dialNum.slice(0,-1);document.getElementById('dd').textContent=dialNum||'\u200b';document.getElementById('call-a').href='tel:'+dialNum;}
+
+/* ── QUICK REPLIES ── */
+let qrTargetUrl=null;
+function openQR(msg){
+  // Generic: show modal, first reply in sheet
+  document.getElementById('qr-sub').textContent='Scegli una risposta';
+  qrTargetUrl=null;
+  document.getElementById('qr-modal').classList.add('show');
+}
+function openQRForContact(waUrl){
+  document.getElementById('qr-sub').textContent='Invia risposta rapida via WhatsApp';
+  qrTargetUrl=waUrl;
+  document.getElementById('qr-modal').classList.add('show');
+}
+function sendQR(msg){
+  const base=qrTargetUrl||'https://wa.me/';
+  const url=base+'?text='+encodeURIComponent(msg);
+  window.open(url,'_blank');
+  document.getElementById('qr-modal').classList.remove('show');
+}
+function closeQRModal(e){
+  if(e.target===document.getElementById('qr-modal'))
+    document.getElementById('qr-modal').classList.remove('show');
+}
+
+/* ── INIT ── */
+setTimeout(()=>{if(!wDone)loadWeather(45.4654,9.1859);},6000);
+</script>
+</body>
+</html>
